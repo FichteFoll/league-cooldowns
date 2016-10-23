@@ -1,0 +1,5 @@
+venv/
+
+*.sublime-*
+
+champion_spells.json

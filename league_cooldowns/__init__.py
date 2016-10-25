@@ -112,7 +112,7 @@ def collect_cooldown_info(participants, data) -> TeamList:
     return [team_map[k] for k in sorted(team_map)]
 
 
-def render_cooldowns(teams: TeamList, summoner_id: int):
+def render_cooldowns(teams: TeamList, summoner_id: int, show_summoner_names: bool):
     _pdebug(teams, "Teams")
 
     titles = ["Blue Team", "Red Team"]
@@ -120,16 +120,23 @@ def render_cooldowns(teams: TeamList, summoner_id: int):
     titles_appendix = {True: "Your Team", False: "Their Team"}
 
     header = ["Champion", "Q", "W", "E", "R"]
+    if show_summoner_names:
+        header[1:1] = ["Summoner"]
     for i, team in enumerate(teams):
         table_data = [header]
         is_your_team = False
         for cd_info in team:
-            cooldowns = [sd.cooldown_burn for sd in cd_info.spell_data]
-            row = [cd_info.champion_name, *cooldowns]
+            row = [cd_info.champion_name]
+            if show_summoner_names:
+                row.append(cd_info.summoner_name)
+            row.extend(sd.cooldown_burn for sd in cd_info.spell_data)
+
+            # Highlight summoner_id column
             if cd_info.summoner_id == summoner_id:
                 is_your_team = True
                 row = [colorama.Fore.YELLOW + cell + colorama.Style.RESET_ALL + colors[i]
                        for cell in row]
+
             table_data.append(row)
 
         title = "{} ({})".format(titles[i], titles_appendix[is_your_team])
@@ -159,7 +166,9 @@ def parse_args():
     parser.add_argument("summoner_name")
     parser.add_argument("--no-check-updates", dest="check_updates", action='store_false',
                         help="Disables checking for data updates")
-    # parser.add_argument("--monitor", action='store_true',
+    parser.add_argument("-n", "--show-summoner-names", action='store_true', default=False,
+                        help="Disables checking for data updates")
+    # parser.add_argument("--monitor", action='store_true', default=False,
     #                     help="Keep looking for active games")
     parser.add_argument("--key", help="Riot API key (otherwise sourced from 'key' file)")
 
@@ -217,6 +226,6 @@ def main():
 
     data = ChampionSpellData(params.check_updates)
     teams = collect_cooldown_info(current_game_info['participants'], data)
-    render_cooldowns(teams, summoner_id)
+    render_cooldowns(teams, summoner_id, params.show_summoner_names)
 
     return 0

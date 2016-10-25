@@ -31,7 +31,7 @@ def _pdebug(data: t.Any, title: str = ""):
     if l.isEnabledFor(logging.DEBUG):
         l.debug("=" * 79)
         if title:
-            l.debug(title)
+            l.debug("  " + title)
             l.debug("+" * 79)
         l.debug(pprint.pformat(data))
         l.debug("=" * 79)
@@ -71,11 +71,10 @@ class ChampionSpellData:
 
         l.info("Checking for updated data...")
         versions = riot_api.get_versions()
-        l.debug("Staticdata versions: %s", versions)
         latest_version = versions[0]
         current_version = self.json['version']
 
-        l.info("Current version: %s, latest version: %s", current_version, latest_version)
+        l.debug("Current version: %s, latest version: %s", current_version, latest_version)
         if latest_version.split(".") > current_version.split("."):
             self._download()
 
@@ -114,7 +113,7 @@ def collect_cooldown_info(participants, data) -> TeamList:
 
 
 def render_cooldowns(teams: TeamList, summoner_id: int):
-    _pdebug(teams)
+    _pdebug(teams, "Teams")
 
     titles = ["Blue Team", "Red Team"]
     colors = [colorama.Fore.CYAN, colorama.Fore.RED]
@@ -166,11 +165,11 @@ def parse_args():
 
     # verbosity control
     parser.add_argument('--verbosity', type=int,
-                        help="Directly control verbosity of output (0 to 5); default: {}"
+                        help="Directly control verbosity of output (0 to 4); default: {}"
                              .format(default_verbosity))
-    parser.add_argument('-v', action='append_const', const=1, dest="v", default=[],
+    parser.add_argument("-v", action='append_const', const=1, dest="v", default=[],
                         help="Increase verbosity level")
-    parser.add_argument('-q', action='append_const', const=-1, dest="v",
+    parser.add_argument("-q", action='append_const', const=-1, dest="v",
                         help="Decrease verbosity level")
 
     params = parser.parse_args()
@@ -179,7 +178,7 @@ def parse_args():
     logging_level = params.verbosity
     if logging_level is None:
         logging_level = default_verbosity + sum(params.v)
-    logging_level = max(0, min(logging_level, 5))
+    logging_level = max(0, min(logging_level, 4))
     logging_level = (5 - logging_level) * 10
 
     return params, logging_level
@@ -214,7 +213,7 @@ def main():
         l.warn("Summoner not currently in game")
         return 0
 
-    _pdebug(current_game_info)
+    _pdebug(current_game_info, "Current Game Info")
 
     data = ChampionSpellData(params.check_updates)
     teams = collect_cooldown_info(current_game_info['participants'], data)

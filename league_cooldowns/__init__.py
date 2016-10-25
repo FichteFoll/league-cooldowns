@@ -157,8 +157,8 @@ def parse_args():
     parser.add_argument("summoner_name")
     parser.add_argument("--no-check-updates", dest="check_updates", action='store_false',
                         help="Disables checking for data updates")
-    parser.add_argument("--monitor", action='store_true',
-                        help="Keep looking for active games")
+    # parser.add_argument("--monitor", action='store_true',
+    #                     help="Keep looking for active games")
     parser.add_argument("--key", help="Riot API key (otherwise sourced from 'key' file)")
 
     # verbosity control

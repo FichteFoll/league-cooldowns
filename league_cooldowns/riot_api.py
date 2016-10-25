@@ -117,7 +117,7 @@ def get_current_game_info(region: str, summoner_id: int) -> t.Optional[JSON]:
             # not in-game
             return None
         else:
-            l.warning("Non-standard result! %s", format_status(result))
+            l.error("Non-standard result! %s", format_status(result))
             return None
     else:
         return result

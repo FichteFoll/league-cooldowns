@@ -1,8 +1,9 @@
 import enum
 import logging
 import re
-import requests
 import typing as t
+
+import requests
 
 HOST = "https://{endpoint}.api.pvp.net"
 
@@ -116,7 +117,7 @@ def get_current_game_info(region: str, summoner_id: int) -> t.Optional[JSON]:
             # not in-game
             return None
         else:
-            l.warn("Non-standard result! %s", format_status(result))
+            l.warning("Non-standard result! %s", format_status(result))
             return None
     else:
         return result

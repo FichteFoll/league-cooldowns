@@ -21,7 +21,7 @@ __file_p__ = pathlib.Path(__file__)
 
 l = logging.getLogger(__name__)
 
-key_file_path = pathlib.Path("key")
+KEY_FILE_PATH = pathlib.Path("key")
 
 
 ###################################################################################################
@@ -193,7 +193,7 @@ def main():
     if params.key:
         riot_api.set_key(params.key)
     else:
-        riot_api.set_key(key_file_path.read_text().strip())
+        riot_api.set_key(KEY_FILE_PATH.read_text().strip())
 
     try:
         riot_api.Platform[params.region]
@@ -210,7 +210,7 @@ def main():
 
     current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
     if current_game_info is None:
-        l.warn("Summoner not currently in game")
+        l.warning("Summoner not currently in game")
         return 0
 
     _pdebug(current_game_info, "Current Game Info")

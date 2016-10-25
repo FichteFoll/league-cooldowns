@@ -16,6 +16,8 @@ l = logging.getLogger(__name__)
 api_key = None  # type: str
 
 
+###################################################################################################
+
 
 class Platform(str, enum.Enum):
     br = "BR1"
@@ -30,11 +32,6 @@ class Platform(str, enum.Enum):
     pbe = "PBE1"
     ru = "RU"
     tr = "TR1"
-
-
-def set_key(key: str):
-    global api_key
-    api_key = key
 
 
 def _build_url(url_base: str, region: str, **kwargs: t.Any):
@@ -52,13 +49,14 @@ def _get_data(url: str, params: Params = None) -> JSON:
         params = {}
     params.setdefault('api_key', api_key)
 
+    l.debug("Requesting '%s' with params: %s", url, params)
     r = requests.get(url, params=params)
     return r.json()
 
 
 def _staticdata(variant: str, params: Params = None, region="euw") -> JSON:
     url = _build_url("/api/lol/static-data/{region}/v1.2/{variant}",
-                     region=region, variant=variant)
+                     region=region, endpoint='global', variant=variant)
 
     return _get_data(url, params)
 
@@ -68,6 +66,18 @@ def _standardize_summoner_name(summoner_name: str) -> str:
     # is the summoner name in all lower case
     # and with spaces removed.
     return re.sub(r"\s", "", summoner_name.lower())
+
+
+###################################################################################################
+
+
+def set_key(key: str):
+    global api_key
+    api_key = key
+
+
+def format_status(data: JSON) -> str:
+    return "Status code: {status_code}, message: {message}".format(**data['status'])
 
 
 def get_champions(params: Params = None) -> JSON:
@@ -102,7 +112,11 @@ def get_current_game_info(region: str, summoner_id: int) -> t.Optional[JSON]:
     # 404 if not in-game
     result = _get_data(url)
     if 'status' in result:
-        l.debug("Non-standard result: %s", result)
-        return None
+        if result['status']['status_code'] == 404:
+            # not in-game
+            return None
+        else:
+            l.warn("Non-standard result! %s", format_status(result))
+            return None
     else:
         return result

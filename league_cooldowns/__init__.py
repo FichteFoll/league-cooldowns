@@ -157,15 +157,26 @@ def parse_args():
     default_verbosity = 3
 
     parser = argparse.ArgumentParser(
-        description="Monitor cooldowns of champions in your current game"
+        description="""
+            Look up a summoner name's current game
+            and display cooldowns of all champions
+            in that game.
+        """
     )
 
-    parser.add_argument("region", default=DEFAULT_REGION)
-    parser.add_argument("summoner_name")
+    parser.add_argument("region", nargs='?', default=DEFAULT_REGION,
+                        help="May be omitted and defaults to '{}'. "
+                             "Use 'help' as region to show the available regions "
+                             "(still requires summoner_name argument)."
+                             .format(DEFAULT_REGION))
+    parser.add_argument("summoner_name",
+                        help="Summoner name to look up. "
+                             "Spaces are stripped by Riot's API.")
+
     parser.add_argument("--no-check-updates", dest="check_updates", action='store_false',
                         help="Disables checking for data updates")
     parser.add_argument("-n", "--show-summoner-names", action='store_true', default=False,
-                        help="Disables checking for data updates")
+                        help="Show summoner names in tables")
     # parser.add_argument("--monitor", action='store_true', default=False,
     #                     help="Keep looking for active games")
     parser.add_argument("--key", help="Riot API key (otherwise sourced from 'key' file)")
@@ -206,6 +217,9 @@ def main():
         riot_api.Platform[params.region]
     except KeyError:
         l.error("Region not found")
+        print("The following regions are available:")
+        for region in riot_api.Platform:
+            print(region.name)
         return 1
 
     l.info("Loading current game info...")

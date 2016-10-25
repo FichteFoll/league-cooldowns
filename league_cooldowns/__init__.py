@@ -147,6 +147,8 @@ def init_logging(level: int):
 
 
 def parse_args():
+    default_verbosity = 3
+
     parser = argparse.ArgumentParser(
         description="Monitor cooldowns of champions in your current game"
     )
@@ -161,7 +163,8 @@ def parse_args():
 
     # verbosity control
     parser.add_argument('--verbosity', type=int,
-                        help="Directly control verbosity of output (0 to 5); default: 3")
+                        help="Directly control verbosity of output (0 to 5); default: {}"
+                             .format(default_verbosity))
     parser.add_argument('-v', action='append_const', const=1, dest="v", default=[],
                         help="Increase verbosity level")
     parser.add_argument('-q', action='append_const', const=-1, dest="v",
@@ -172,7 +175,7 @@ def parse_args():
     # translate verbosity to logging level
     logging_level = params.verbosity
     if logging_level is None:
-        logging_level = 3 + sum(params.v)
+        logging_level = default_verbosity + sum(params.v)
     logging_level = max(0, min(logging_level, 5))
     logging_level = (5 - logging_level) * 10
 

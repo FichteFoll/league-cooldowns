@@ -1,14 +1,35 @@
+import enum
+import logging
+import re
 import requests
 import typing as t
+
+HOST = "https://{endpoint}.api.pvp.net"
 
 # Commonly used types (for type hints)
 Params = t.Dict[str, str]
 JSON = t.Dict[str, t.Any]
 
 
+l = logging.getLogger(__name__)
+
 api_key = None  # type: str
 
-HOST = "https://{endpoint}.api.pvp.net"
+
+
+class Platform(str, enum.Enum):
+    br = "BR1"
+    eune = "EUN1"
+    euw = "EUW1"
+    jp = "JP1"
+    kr = "KR"
+    lan = "LA1"
+    las = "LA2"
+    na = "NA1"
+    oce = "OC1"
+    pbe = "PBE1"
+    ru = "RU"
+    tr = "TR1"
 
 
 def set_key(key: str):
@@ -42,9 +63,46 @@ def _staticdata(variant: str, params: Params = None, region="euw") -> JSON:
     return _get_data(url, params)
 
 
+def _standardize_summoner_name(summoner_name: str) -> str:
+    # The standardized summoner name
+    # is the summoner name in all lower case
+    # and with spaces removed.
+    return re.sub(r"\s", "", summoner_name.lower())
+
+
 def get_champions(params: Params = None) -> JSON:
     return _staticdata("champion", params)
 
 
 def get_versions() -> JSON:
     return _staticdata("versions")
+
+
+def get_summoner_id(region: str, summoner_name: str) -> t.Optional[int]:
+    """Determine ID of a summoner by name.
+
+    Returns None if summoner name is not found.
+    """
+    standardized_name = _standardize_summoner_name(summoner_name)
+    url = _build_url("/api/lol/{region}/v1.4/summoner/by-name/{summoner_name}",
+                     region=region, summoner_name=standardized_name)
+
+    result = _get_data(url)
+
+    if standardized_name not in result:
+        return None
+    else:
+        return result[standardized_name]['id']
+
+
+def get_current_game_info(region: str, summoner_id: int) -> t.Optional[JSON]:
+    url = _build_url("/observer-mode/rest/consumer/getSpectatorGameInfo/{platform}/{summoner_id}",
+                     region=region, summoner_id=summoner_id)
+
+    # 404 if not in-game
+    result = _get_data(url)
+    if 'status' in result:
+        l.debug("Non-standard result: %s", result)
+        return None
+    else:
+        return result

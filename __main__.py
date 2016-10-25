@@ -8,6 +8,8 @@ import sys
 
 import riot_api
 
+DEFAULT_REGION = "euw"
+
 __file_p__ = pathlib.Path(__file__)
 
 l = logging.getLogger(__name__)
@@ -57,20 +59,21 @@ def init_logging():
     formatter = logging.Formatter("{message}", style="{")
     handler.setFormatter(formatter)
     l.addHandler(handler)
-    l.setLevel(logging.INFO)
+    l.setLevel(logging.DEBUG)
+    # l.setLevel(logging.INFO)
 
 
 def parse_args():
     parser = argparse.ArgumentParser(
         description="Monitor cooldowns of champions in your current game"
     )
-    parser.add_argument("region")
+    parser.add_argument("region", default=DEFAULT_REGION)
     parser.add_argument("summoner_name")
     parser.add_argument("--no-check-updates", dest="check_updates", action='store_false',
                         help="Disables checking for data updates")
     parser.add_argument("--monitor", action='store_true',
                         help="Keep looking for active games")
-    parser.add_argument("--key", help="Riot API key")
+    parser.add_argument("--key", help="Riot API key (otherwise sourced from 'key' file)")
     return parser.parse_args()
 
 
@@ -82,14 +85,38 @@ def main():
     if params.key:
         riot_api.set_key(params.key)
     else:
-        riot_api.set_key(key_file_path.read_text().trim())
+        riot_api.set_key(key_file_path.read_text().strip())
 
-    # load current game info
-    #
+    try:
+        riot_api.Platform[params.region]
+    except KeyError:
+        l.error("Region not found")
+        return 1
+
+    l.info("Loading current game info...")
+    summoner_id = riot_api.get_summoner_id(params.region, params.summoner_name)
+    l.debug("Summoner id: %d", summoner_id)
+    if summoner_id is None:
+        l.error("Summoner name not found")
+        return 2
+
+    current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+    if current_game_info is None:
+        l.warn("Summoner not currently in game")
+        return 0
+
+    import pprint
+    pprint.pprint(current_game_info)
+
+    # TODO extract participating champions (and summnames)
+
     # load champion data
     data = ChampionSpellData(params.check_updates)
-    # extract cooldown information
+    # TODO extract cooldown information
     # 'cooldownBurn'
 
+    return 0
+
+
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

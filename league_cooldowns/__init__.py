@@ -9,6 +9,7 @@ import pprint
 import sys
 import typing as t
 
+import colorama
 import terminaltables
 
 from . import riot_api
@@ -116,7 +117,7 @@ def render_cooldowns(teams: TeamList, summoner_id: int):
     _pdebug(teams)
 
     titles = ["Blue Team", "Red Team"]
-    # colors = ["Blue Team", "Red Team"]
+    colors = [colorama.Fore.CYAN, colorama.Fore.RED]
     titles_appendix = {True: "Your Team", False: "Their Team"}
 
     header = ["Champion", "Q", "W", "E", "R"]
@@ -124,15 +125,17 @@ def render_cooldowns(teams: TeamList, summoner_id: int):
         table_data = [header]
         is_your_team = False
         for cd_info in team:
-            if cd_info.summoner_id == summoner_id:
-                is_your_team = True
             cooldowns = [sd.cooldown_burn for sd in cd_info.spell_data]
             row = [cd_info.champion_name, *cooldowns]
+            if cd_info.summoner_id == summoner_id:
+                is_your_team = True
+                row = [colorama.Fore.YELLOW + cell + colorama.Style.RESET_ALL + colors[i]
+                       for cell in row]
             table_data.append(row)
 
         title = "{} ({})".format(titles[i], titles_appendix[is_your_team])
         table = terminaltables.SingleTable(table_data, title)
-        print(table.table)  # colorize
+        print("{}{}{}".format(colors[i], table.table, colorama.Style.RESET_ALL))  # colorize
 
 ###################################################################################################
 
@@ -183,6 +186,7 @@ def parse_args():
 
 
 def main():
+    colorama.init()
     params, logging_level = parse_args()
 
     init_logging(logging_level)

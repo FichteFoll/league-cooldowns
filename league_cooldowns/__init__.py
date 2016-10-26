@@ -1,10 +1,12 @@
 import argparse
 import collections
+import datetime
 import json
 import logging
 import pathlib
 import pprint
 import sys
+import time
 import typing as t
 
 import colorama
@@ -33,6 +35,9 @@ def _pdebug(data: t.Any, title: str = ""):
             l.debug("+" * 79)
         l.debug(pprint.pformat(data))
         l.debug("=" * 79)
+
+
+_now = datetime.datetime.now
 
 
 class ChampionSpellData:
@@ -177,8 +182,8 @@ def parse_args():
                         help="Disables checking for data updates")
     parser.add_argument("-n", "--show-summoner-names", action='store_true', default=False,
                         help="Show summoner names in tables")
-    # parser.add_argument("--monitor", action='store_true', default=False,
-    #                     help="Keep looking for active games")
+    parser.add_argument("--monitor", action='store_true', default=False,
+                        help="Keep looking for active games")
     parser.add_argument("--key", help="Riot API key (otherwise sourced from 'key' file)")
 
     # verbosity control
@@ -222,13 +227,20 @@ def main():
             print(region.name)
         return 1
 
-    l.info("Loading current game info...")
     summoner_id = riot_api.get_summoner_id(params.region, params.summoner_name)
     l.debug("Summoner id: %d", summoner_id)
     if summoner_id is None:
         l.error("Summoner name not found")
         return 2
 
+    if not params.monitor:
+        return do_once(params, summoner_id)
+    else:
+        return monitor(params, summoner_id)
+
+
+def do_once(params, summoner_id):
+    l.info("Loading current game info...")
     current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
     if current_game_info is None:
         l.warning("Summoner not currently in game")
@@ -241,3 +253,36 @@ def main():
     render_cooldowns(teams, summoner_id, params.show_summoner_names)
 
     return 0
+
+
+def monitor(params, summoner_id):
+    data = ChampionSpellData(params.check_updates)
+
+    print("Monitor mode enabled. Press Ctrl-C to quit.")
+
+    current_game_info = None
+    while True:
+        print("Loading current game info... ({:%x %X})".format(_now()))
+        if not current_game_info:
+            current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+        if not current_game_info:
+            print("Summoner not currently in game")
+            time.sleep(30)
+            print(colorama.Cursor.UP(2), end='')
+            continue
+
+        _pdebug(current_game_info, "Current Game Info")
+        teams = collect_cooldown_info(current_game_info['participants'], data)
+        render_cooldowns(teams, summoner_id, params.show_summoner_names)
+
+        while True:
+            time.sleep(60)
+            new_current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+            if not new_current_game_info:
+                print("Game ended ({:%x %X})".format(_now()))
+                break
+
+            if new_current_game_info != current_game_info:
+                current_game_info = new_current_game_info
+                print("New game detected! ({:%x %X})".format(_now()))
+                break

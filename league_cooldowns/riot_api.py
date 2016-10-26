@@ -110,11 +110,9 @@ def get_current_game_info(region: str, summoner_id: int) -> t.Optional[JSON]:
     url = _build_url("/observer-mode/rest/consumer/getSpectatorGameInfo/{platform}/{summoner_id}",
                      region=region, summoner_id=summoner_id)
 
-    # 404 if not in-game
     result = _get_data(url)
     if 'status' in result:
-        if result['status']['status_code'] == 404:
-            # not in-game
+        if result['status']['status_code'] == 404:  # not in-game
             return None
         else:
             l.error("Non-standard result! %s", format_status(result))

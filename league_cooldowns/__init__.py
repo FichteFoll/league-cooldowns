@@ -280,11 +280,13 @@ def monitor(params, summoner_id):
         while True:
             time.sleep(60)
             new_current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+
             if not new_current_game_info:
                 print("Game ended ({:%x %X})".format(_now()))
+                current_game_info = None
                 break
 
-            if new_current_game_info != current_game_info:
-                current_game_info = new_current_game_info
+            elif new_current_game_info['gameId'] != current_game_info['gameId']:
                 print("New game detected! ({:%x %X})".format(_now()))
+                current_game_info = new_current_game_info
                 break

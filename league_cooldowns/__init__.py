@@ -264,13 +264,14 @@ def monitor(params, summoner_id):
 
     current_game_info = None
     while True:
-        print("Loading current game info... ({:%x %X})".format(_now()))
         if not current_game_info:
+            print("Loading current game info... ({:%x %X})".format(_now()))
             current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
         if not current_game_info:
             print("Summoner not currently in game")
             time.sleep(30)
-            print(colorama.Cursor.UP(2), end='')
+            if not l.isEnabledFor(logging.DEBUG):
+                print(colorama.Cursor.UP(2), end='')
             continue
 
         _pdebug(current_game_info, "Current Game Info")

@@ -111,7 +111,9 @@ def collect_cooldown_info(participants, data) -> TeamList:
                                spell_data)
         team_map[part['teamId']].append(cd_info)
 
-    assert len(team_map) == 2
+    # A few defensive checks
+    assert len(team_map) in (1, 2)
+    assert 100 in team_map
     return [team_map[k] for k in sorted(team_map)]
 
 

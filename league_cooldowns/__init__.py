@@ -47,6 +47,7 @@ class ChampionSpellData:
 
     def __init__(self, check_updates: bool = True):
         self.json = None
+        l.info("Loading champion spell data...")
         self._load()
         if check_updates:
             self.sync()
@@ -72,7 +73,7 @@ class ChampionSpellData:
             self._download()
             return
 
-        l.info("Checking for updated data...")
+        l.debug("Checking for updated data...")
         versions = riot_api.get_versions()
         latest_version = versions[0]
         current_version = self.json['version']
@@ -88,6 +89,32 @@ class ChampionSpellData:
         return None
 
 
+def _format_map_name(game_map: riot_api.const.Map) -> str:
+    name = game_map.name
+    name_parts = [s.capitalize() for s in name.split("_")]
+    if name_parts[-1] in ('Summer', 'Autumn', 'Original'):
+        name_parts[-1] = "({})".format(name_parts[-1])
+    return " ".join(name_parts)
+
+
+def show_game_info(current_game_info: riot_api.JSON):
+    game_type = riot_api.const.GameType(current_game_info['gameType'])
+    game_mode = riot_api.const.GameMode(current_game_info['gameMode'])
+    game_map = riot_api.const.Map(current_game_info['mapId'])
+    game_queue = riot_api.const.Queue.for_id(current_game_info['gameQueueConfigId'])
+
+    type_appendix = ""
+    if game_type == riot_api.const.GameType.CUSTOM:
+        type_appendix = " (Custom)"
+    elif game_type == riot_api.const.GameType.TUTORIAL:
+        type_appendix = " (Tutorial)"
+    elif game_queue in riot_api.const.RANKED_QUEUES:
+        type_appendix = " (Ranked)"
+
+    print("Game Mode: {}, Map: {}{}"
+          .format(game_mode.formatted, game_map.formatted, type_appendix))
+
+
 SpellData = collections.namedtuple("SpellData", "cooldown cooldown_burn")
 
 CooldownInfo = collections.namedtuple("CooldownInfo",
@@ -97,7 +124,7 @@ CooldownInfo = collections.namedtuple("CooldownInfo",
 TeamList = t.List[t.List[CooldownInfo]]
 
 
-def collect_cooldown_info(participants, data) -> TeamList:
+def collect_cooldown_info(participants: riot_api.JSON, data: ChampionSpellData) -> TeamList:
     team_map = collections.defaultdict(list)
 
     for part in participants:
@@ -117,7 +144,7 @@ def collect_cooldown_info(participants, data) -> TeamList:
     return [team_map[k] for k in sorted(team_map)]
 
 
-def render_cooldowns(teams: TeamList, summoner_id: int, show_summoner_names: bool):
+def show_cooldowns(teams: TeamList, summoner_id: int, show_summoner_names: bool):
     _pdebug(teams, "Teams")
 
     titles = ["Blue Team", "Red Team"]
@@ -147,6 +174,65 @@ def render_cooldowns(teams: TeamList, summoner_id: int, show_summoner_names: boo
         title = "{} ({})".format(titles[i], titles_appendix[is_your_team])
         table = terminaltables.SingleTable(table_data, title)
         print("{}{}{}".format(colors[i], table.table, colorama.Style.RESET_ALL))  # colorize
+
+
+def do_once(params, summoner_id):
+    l.info("Loading current game info...")
+    current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+    if current_game_info is None:
+        l.warning("Summoner not currently in game")
+        return 0
+
+    data = ChampionSpellData(params.check_updates)
+
+    _pdebug(current_game_info, "Current Game Info")
+    print()
+    show_game_info(current_game_info)
+
+    teams = collect_cooldown_info(current_game_info['participants'], data)
+    show_cooldowns(teams, summoner_id, params.show_summoner_names)
+
+    return 0
+
+
+def monitor(params, summoner_id):
+    data = ChampionSpellData(params.check_updates)
+
+    print("Monitor mode enabled. Press Ctrl-C to quit.")
+
+    current_game_info = None
+    while True:
+        if not current_game_info:
+            print("Loading current game info... ({:%x %X})".format(_now()))
+            current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+        if not current_game_info:
+            print("Summoner not currently in game")
+            time.sleep(30)
+            if not l.isEnabledFor(logging.DEBUG):
+                print(colorama.Cursor.UP(2), end='')
+            continue
+
+        _pdebug(current_game_info, "Current Game Info")
+        print()
+        show_game_info(current_game_info)
+
+        teams = collect_cooldown_info(current_game_info['participants'], data)
+        show_cooldowns(teams, summoner_id, params.show_summoner_names)
+
+        while True:
+            time.sleep(60)
+            new_current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
+
+            if not new_current_game_info:
+                print("Game ended ({:%x %X})".format(_now()))
+                current_game_info = None
+                break
+
+            elif new_current_game_info['gameId'] != current_game_info['gameId']:
+                print("New game detected! ({:%x %X})".format(_now()))
+                current_game_info = new_current_game_info
+                break
+
 
 ###################################################################################################
 
@@ -181,10 +267,10 @@ def parse_args():
                              "Spaces are stripped by Riot's API.")
 
     parser.add_argument("--no-check-updates", dest="check_updates", action='store_false',
-                        help="Disables checking for data updates")
+                        default=True, help="Disables checking for data updates")
     parser.add_argument("-n", "--show-summoner-names", action='store_true', default=False,
                         help="Show summoner names in tables")
-    parser.add_argument("--monitor", action='store_true', default=False,
+    parser.add_argument("-m", "--monitor", action='store_true', default=False,
                         help="Keep looking for active games")
     parser.add_argument("--key", help="Riot API key (otherwise sourced from 'key' file)")
 
@@ -221,11 +307,11 @@ def main():
         riot_api.set_key(KEY_FILE_PATH.read_text().strip())
 
     try:
-        riot_api.Platform[params.region]
+        riot_api.const.Platform[params.region]
     except KeyError:
         l.error("Region not found")
         print("The following regions are available:")
-        for region in riot_api.Platform:
+        for region in riot_api.const.Platform:
             print(region.name)
         return 1
 
@@ -239,55 +325,3 @@ def main():
         return do_once(params, summoner_id)
     else:
         return monitor(params, summoner_id)
-
-
-def do_once(params, summoner_id):
-    l.info("Loading current game info...")
-    current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
-    if current_game_info is None:
-        l.warning("Summoner not currently in game")
-        return 0
-
-    _pdebug(current_game_info, "Current Game Info")
-
-    data = ChampionSpellData(params.check_updates)
-    teams = collect_cooldown_info(current_game_info['participants'], data)
-    render_cooldowns(teams, summoner_id, params.show_summoner_names)
-
-    return 0
-
-
-def monitor(params, summoner_id):
-    data = ChampionSpellData(params.check_updates)
-
-    print("Monitor mode enabled. Press Ctrl-C to quit.")
-
-    current_game_info = None
-    while True:
-        if not current_game_info:
-            print("Loading current game info... ({:%x %X})".format(_now()))
-            current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
-        if not current_game_info:
-            print("Summoner not currently in game")
-            time.sleep(30)
-            if not l.isEnabledFor(logging.DEBUG):
-                print(colorama.Cursor.UP(2), end='')
-            continue
-
-        _pdebug(current_game_info, "Current Game Info")
-        teams = collect_cooldown_info(current_game_info['participants'], data)
-        render_cooldowns(teams, summoner_id, params.show_summoner_names)
-
-        while True:
-            time.sleep(60)
-            new_current_game_info = riot_api.get_current_game_info(params.region, summoner_id)
-
-            if not new_current_game_info:
-                print("Game ended ({:%x %X})".format(_now()))
-                current_game_info = None
-                break
-
-            elif new_current_game_info['gameId'] != current_game_info['gameId']:
-                print("New game detected! ({:%x %X})".format(_now()))
-                current_game_info = new_current_game_info
-                break

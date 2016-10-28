@@ -1,9 +1,10 @@
-import enum
 import logging
 import re
 import typing as t
 
 import requests
+
+from . import const
 
 HOST = "https://{endpoint}.api.pvp.net"
 
@@ -20,27 +21,12 @@ api_key = None  # type: str
 ###################################################################################################
 
 
-class Platform(str, enum.Enum):
-    br = "BR1"
-    eune = "EUN1"
-    euw = "EUW1"
-    jp = "JP1"
-    kr = "KR"
-    lan = "LA1"
-    las = "LA2"
-    na = "NA1"
-    oce = "OC1"
-    pbe = "PBE1"
-    ru = "RU"
-    tr = "TR1"
-
-
 def _build_url(url_base: str, region: str, **kwargs: t.Any):
     if url_base.startswith("/"):
         url_base = HOST + url_base
     kwargs.setdefault('endpoint', region)
     kwargs.setdefault('region', region)
-    kwargs.setdefault('platform', Platform[region])
+    kwargs.setdefault('platform', const.Platform[region])
 
     return url_base.format(**kwargs)
 

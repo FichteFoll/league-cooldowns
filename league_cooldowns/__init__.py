@@ -89,14 +89,6 @@ class ChampionSpellData:
         return None
 
 
-def _format_map_name(game_map: riot_api.const.Map) -> str:
-    name = game_map.name
-    name_parts = [s.capitalize() for s in name.split("_")]
-    if name_parts[-1] in ('Summer', 'Autumn', 'Original'):
-        name_parts[-1] = "({})".format(name_parts[-1])
-    return " ".join(name_parts)
-
-
 def show_game_info(current_game_info: riot_api.JSON):
     game_type = riot_api.const.GameType(current_game_info['gameType'])
     game_mode = riot_api.const.GameMode(current_game_info['gameMode'])
